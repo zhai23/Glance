@@ -23,9 +23,9 @@ use bing_translate::BingTranslateClient;
 use llm_translate::LlmTranslateClient;
 use commands::{
     begin_capture, begin_copy_capture, cancel_capture, capture_debug_log, clear_history,
-    close_overlay, close_toast, hide_window, list_history, load_capture_payload,
-    load_overlay_payload, load_settings, resize_main_window, save_settings, show_overlay,
-    submit_capture_selection, translate_text,
+    close_overlay, hide_window, list_history, load_capture_payload, load_overlay_payload,
+    load_settings, resize_main_window, save_settings, show_overlay, submit_capture_selection,
+    translate_text,
 };
 use config::ConfigStore;
 use models::TranslatorSettings;
@@ -209,7 +209,6 @@ fn main() {
             show_overlay,
             load_overlay_payload,
             close_overlay,
-            close_toast,
             translate_text,
             resize_main_window,
             hide_window,

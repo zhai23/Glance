@@ -254,6 +254,7 @@ pub struct CaptureViewPayload {
     pub image_mime: String,
     pub image_width: u32,
     pub image_height: u32,
+    pub copy_text_mode: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]

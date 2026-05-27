@@ -287,12 +287,29 @@ pub async fn capture_debug_log(message: String) -> AppResult<()> {
 
 #[tauri::command]
 pub async fn begin_capture(app: AppHandle, state: State<'_, SharedState>) -> AppResult<()> {
-    if *state.capture_in_progress.read().await {
+    begin_capture_with_mode(app, state, CaptureMode::Translate).await
+}
+
+#[tauri::command]
+pub async fn begin_copy_capture(app: AppHandle, state: State<'_, SharedState>) -> AppResult<()> {
+    begin_capture_with_mode(app, state, CaptureMode::CopyText).await
+}
+
+async fn begin_capture_with_mode(
+    app: AppHandle,
+    state: State<'_, SharedState>,
+    mode: CaptureMode,
+) -> AppResult<()> {
+    let mut capture_in_progress = state.capture_in_progress.write().await;
+    if *capture_in_progress {
         return Err(AppError::Capture(
             "a capture session is already running".into(),
         ));
     }
-    *state.capture_in_progress.write().await = true;
+    *capture_in_progress = true;
+    drop(capture_in_progress);
+
+    *state.capture_mode.write().await = mode;
 
     let result = begin_capture_impl(&app, state.inner()).await;
     if result.is_err() {
@@ -300,12 +317,6 @@ pub async fn begin_capture(app: AppHandle, state: State<'_, SharedState>) -> App
         emit_workflow_state(&app, "", "", false).ok();
     }
     result
-}
-
-#[tauri::command]
-pub async fn begin_copy_capture(app: AppHandle, state: State<'_, SharedState>) -> AppResult<()> {
-    *state.capture_mode.write().await = CaptureMode::CopyText;
-    begin_capture(app, state).await
 }
 
 async fn begin_capture_impl(app: &AppHandle, state: &SharedState) -> AppResult<()> {
@@ -418,7 +429,7 @@ async fn begin_capture_impl(app: &AppHandle, state: &SharedState) -> AppResult<(
 
         create_capture_window(app, window_x, window_y, window_width, window_height)?;
         capture_timeline(&t0, "capture window created");
-        emit_workflow_state(app, "请框选需要翻译的区域", "", false)?;
+        emit_workflow_state(app, capture_prompt_message(state).await, "", false)?;
     }
 
     #[cfg(not(target_os = "macos"))]
@@ -476,8 +487,15 @@ async fn begin_capture_impl(app: &AppHandle, state: &SharedState) -> AppResult<(
     }
 
     #[cfg(not(target_os = "macos"))]
-    emit_workflow_state(app, "请框选需要翻译的区域", "", false)?;
+    emit_workflow_state(app, capture_prompt_message(state).await, "", false)?;
     Ok(())
+}
+
+async fn capture_prompt_message(state: &SharedState) -> &'static str {
+    match *state.capture_mode.read().await {
+        CaptureMode::CopyText => "请框选需要复制的文字",
+        CaptureMode::Translate => "请框选需要翻译的区域",
+    }
 }
 
 #[tauri::command]
@@ -506,6 +524,7 @@ pub async fn load_capture_payload(state: State<'_, SharedState>) -> AppResult<Ca
         image_mime: session.preview_image_mime.clone(),
         image_width: session.img_w,
         image_height: session.img_h,
+        copy_text_mode: *state.capture_mode.read().await == CaptureMode::CopyText,
     })
 }
 
@@ -553,13 +572,9 @@ pub async fn submit_capture_selection(
                 if let Err(e) = copy_to_clipboard(&ocr_result.text) {
                     tracing::warn!("clipboard copy failed: {e}");
                 }
-                // Close capture window
-                 let _ = close_capture_window(&app);
-                // Show toast (works on all platforms)
-                show_toast(&app, selection.x, selection.y, &state).await.ok();
-                 // Reset state since capture is complete
-                 reset_capture_state(state.inner()).await;
-                emit_workflow_state(&app, "已复制到剪贴板", "ok", false).ok();
+                let _ = close_capture_window(&app);
+                reset_capture_state(state.inner()).await;
+                emit_workflow_state(&app, "", "", false).ok();
                 Ok(CaptureTranslatePayload {
                     image_base64: String::new(),
                     selection,
@@ -680,8 +695,7 @@ async fn handle_capture_events(
                                 tracing::warn!("clipboard copy failed: {e}");
                             }
                             let _ = capture_window::capture_proxy().send_event(CaptureCommand::Close);
-                            show_toast(&app, x, y, &state).await.ok();
-                            emit_workflow_state(&app, "已复制到剪贴板", "ok", false).ok();
+                            emit_workflow_state(&app, "", "", false).ok();
                         }
                         Err(e) => {
                             tracing::error!("OCR error: {e}");
@@ -1029,44 +1043,6 @@ fn copy_to_clipboard(text: &str) -> AppResult<()> {
     Ok(())
 }
 
-async fn show_toast(app: &AppHandle, x: u32, y: u32, state: &SharedState) -> AppResult<()> {
-    let label = "toast";
-    if let Some(w) = app.get_webview_window(label) {
-        let _ = w.close();
-    }
-
-    let session = state.capture_session.read().await;
-    let Some(ref session) = *session else {
-        return Ok(());
-    };
-
-    let screen_x = session.monitor_x + x as i32;
-    let screen_y = session.monitor_y + y as i32;
-
-    let url = WebviewUrl::App("toast.html".into());
-    let _window = WebviewWindowBuilder::new(app, label, url)
-        .title("")
-        .decorations(false)
-        .always_on_top(true)
-        .skip_taskbar(true)
-        .shadow(false)
-        .resizable(false)
-        .focused(false)
-        .visible(true)
-        .inner_size(200.0, 44.0)
-        .position(screen_x as f64, screen_y as f64)
-        .build()?;
-    Ok(())
-}
-
-#[tauri::command]
-pub async fn close_toast(app: AppHandle) -> AppResult<()> {
-    if let Some(w) = app.get_webview_window("toast") {
-        w.close()?;
-    }
-    Ok(())
-}
-
 fn emit_workflow_state(app: &AppHandle, message: &str, kind: &str, busy: bool) -> AppResult<()> {
     app.emit_to(
         "main",
@@ -1258,4 +1234,3 @@ fn create_overlay_window(
     window.set_focus()?;
     Ok(())
 }
-

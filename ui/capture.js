@@ -11,6 +11,7 @@ const state = {
   selectionCss: null,
   selectionImage: null,
   loading: false,
+  copyTextMode: false,
   previewReady: false,
   resultImageBase64: "",
   error: ""
@@ -131,6 +132,10 @@ function updatePreviewImages() {
   }
 }
 
+function loadingHintText() {
+  return state.copyTextMode ? "正在识别文字…" : "正在翻译…";
+}
+
 function updateSelectionLayer() {
   const selectionEl = document.querySelector("#capture-selection");
   const previewEl = document.querySelector("#capture-selection-preview");
@@ -165,7 +170,7 @@ function updateSelectionLayer() {
   } else {
     resultEl.hidden = true;
     previewEl.hidden = false;
-    hintEl.textContent = state.loading ? "正在翻译…" : "拖拽选择区域 · Esc/右键取消";
+    hintEl.textContent = state.loading ? loadingHintText() : "拖拽选择区域 · Esc/右键取消";
   }
 }
 
@@ -308,6 +313,7 @@ async function boot() {
   for (let i = 0; i < 200; i++) {
     try {
       state.payload = await invoke("load_capture_payload");
+      state.copyTextMode = Boolean(state.payload.copyTextMode);
       debugTimelineSoon(`load_capture_payload success attempts=${i + 1} wait=${(performance.now() - payloadStartedAt).toFixed(1)}ms`);
       updatePreviewImages();
       break;
