@@ -3,6 +3,7 @@
 mod api;
 mod app_state;
 mod bing_translate;
+mod builtin_translate;
 mod capture;
 mod capture_window;
 mod commands;
@@ -20,6 +21,7 @@ use std::path::PathBuf;
 use api::YoudaoClient;
 use app_state::SharedState;
 use bing_translate::BingTranslateClient;
+use builtin_translate::BuiltinTranslateClient;
 use llm_translate::LlmTranslateClient;
 use commands::{
     begin_capture, begin_copy_capture, cancel_capture, capture_debug_log, clear_history,
@@ -146,8 +148,9 @@ fn main() {
 
                 let api_client = YoudaoClient::new(general_http.clone());
                 let bing_client = BingTranslateClient::new(bing_http);
+                let builtin_client = BuiltinTranslateClient::new();
                 let llm_client = LlmTranslateClient::new(general_http);
-                let text_translator = TextTranslator::new(bing_client, llm_client);
+                let text_translator = TextTranslator::new(bing_client, builtin_client, llm_client);
                 app_handle.manage(SharedState::new(
                     config_store,
                     settings,

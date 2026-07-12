@@ -22,8 +22,26 @@ const TTS_LANG_MAP = {
 
 const TRANSLATE_ENGINES = [
   { value: "bing", label: "必应" },
+  { value: "google", label: "Google" },
+  { value: "microsoft", label: "微软" },
+  { value: "transmart", label: "腾讯" },
+  { value: "yandex", label: "Yandex" },
+  { value: "iciba", label: "词霸" },
   { value: "llm", label: "AI 大模型" }
 ];
+
+const PROXY_MODES = [
+  { value: "system", label: "系统代理" },
+  { value: "custom", label: "自定义" },
+  { value: "none", label: "不使用" }
+];
+
+function settingsHeight() {
+  let h = 560;
+  if (state.settings?.textTranslateEngine === "llm") h += 200;
+  if (state.settings?.proxyMode === "custom") h += 56;
+  return h;
+}
 
 let debounceTimer = null;
 
@@ -87,7 +105,9 @@ function defaultSettings() {
       apiKey: "",
       model: "gpt-4o-mini"
     },
-    popupShortcut: null
+    popupShortcut: null,
+    proxyMode: "system",
+    customProxy: ""
   };
 }
 
@@ -229,6 +249,20 @@ function renderMain() {
             </div>
           </div>
           <div class="settings-row">
+            <span class="settings-label">网络代理</span>
+            <div class="engine-switcher" id="proxy-switcher">
+              ${PROXY_MODES.map(p =>
+                `<button class="engine-btn ${state.settings.proxyMode === p.value ? "active" : ""}" data-proxy="${p.value}">${p.label}</button>`
+              ).join("")}
+            </div>
+          </div>
+          <div class="settings-row" id="custom-proxy-row" style="${state.settings.proxyMode === "custom" ? "" : "display:none"}">
+            <span class="settings-label">代理地址</span>
+            <input class="settings-input" id="custom-proxy" type="text"
+                    value="${escapeHtml(state.settings.customProxy || "")}"
+                    placeholder="http://127.0.0.1:7890" />
+          </div>
+          <div class="settings-row">
             <span class="settings-label">开机自启</span>
             <button class="toggle ${state.settings.autostart ? "on" : ""}" id="autostart" aria-pressed="${state.settings.autostart}"></button>
           </div>
@@ -300,8 +334,7 @@ function renderMain() {
     panel.style.display = state.settingsOpen ? "" : "none";
     btn.classList.toggle("open", state.settingsOpen);
     if (state.settingsOpen) {
-      const h = state.settings.textTranslateEngine === "llm" ? 620 : 520;
-      invoke?.("resize_main_window", { height: h }).catch(() => {});
+      invoke?.("resize_main_window", { height: settingsHeight() }).catch(() => {});
     } else {
       invoke?.("resize_main_window", { height: 400 }).catch(() => {});
     }
@@ -321,22 +354,37 @@ function renderMain() {
   document.querySelector("#popup-shortcut-row").addEventListener("click", e => { e.stopPropagation(); startPopupShortcutRecording(); });
 
   // Engine switcher
-  document.querySelectorAll(".engine-btn").forEach(btn => {
+  document.querySelectorAll("#engine-switcher .engine-btn").forEach(btn => {
     btn.addEventListener("click", e => {
       e.stopPropagation();
       const newEngine = e.currentTarget.dataset.engine;
       state.settings.textTranslateEngine = newEngine;
       saveSettings().catch(() => {});
       // Update active state
-      document.querySelectorAll(".engine-btn").forEach(b => b.classList.toggle("active", b.dataset.engine === newEngine));
+      document.querySelectorAll("#engine-switcher .engine-btn").forEach(b => b.classList.toggle("active", b.dataset.engine === newEngine));
       // Toggle LLM settings visibility
       const llmSettings = document.querySelector("#llm-settings");
       if (llmSettings) llmSettings.style.display = newEngine === "llm" ? "" : "none";
       // Resize window
-      const h = newEngine === "llm" ? 620 : 520;
-      invoke?.("resize_main_window", { height: h }).catch(() => {});
+      invoke?.("resize_main_window", { height: settingsHeight() }).catch(() => {});
     });
   });
+
+  // Proxy mode switcher
+  document.querySelectorAll("#proxy-switcher .engine-btn").forEach(btn => {
+    btn.addEventListener("click", e => {
+      e.stopPropagation();
+      const newMode = e.currentTarget.dataset.proxy;
+      state.settings.proxyMode = newMode;
+      saveSettings().catch(() => {});
+      document.querySelectorAll("#proxy-switcher .engine-btn").forEach(b => b.classList.toggle("active", b.dataset.proxy === newMode));
+      const customRow = document.querySelector("#custom-proxy-row");
+      if (customRow) customRow.style.display = newMode === "custom" ? "" : "none";
+      invoke?.("resize_main_window", { height: settingsHeight() }).catch(() => {});
+    });
+  });
+  const customProxyInput = document.querySelector("#custom-proxy");
+  if (customProxyInput) customProxyInput.addEventListener("change", e => { state.settings.customProxy = e.target.value.trim(); saveSettings().catch(() => {}); });
 
   // LLM config inputs
   const baseUrlInput = document.querySelector("#llm-base-url");
