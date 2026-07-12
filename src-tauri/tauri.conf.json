@@ -25,7 +25,8 @@
         "minWidth": 520,
         "minHeight": 400,
         "decorations": true,
-        "shadow": true
+        "shadow": true,
+        "visible": false
       }
     ]
   },
