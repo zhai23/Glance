@@ -51,6 +51,8 @@ impl TextTranslator {
                         &llm_config.base_url,
                         &llm_config.api_key,
                         &llm_config.model,
+                        &llm_config.prompt,
+                        &llm_config.auto_prompt,
                     )
                     .await
             }

@@ -47,6 +47,10 @@ pub struct LlmConfig {
     pub api_key: String,
     #[serde(default = "default_llm_model")]
     pub model: String,
+    #[serde(default = "default_llm_prompt")]
+    pub prompt: String,
+    #[serde(default = "default_llm_auto_prompt")]
+    pub auto_prompt: String,
 }
 
 fn default_llm_base_url() -> String {
@@ -57,12 +61,32 @@ fn default_llm_model() -> String {
     "gpt-4o-mini".to_string()
 }
 
+/// Default system prompt for the LLM translation engine when the source
+/// language is explicitly chosen. Supports the placeholders `{from}` and `{to}`,
+/// which are replaced with the source and target language labels at request time.
+pub fn default_llm_prompt() -> String {
+    "You are a professional translator. Translate the following text from {from} to {to}. \
+     Only output the translation, nothing else. Do not add explanations or notes."
+        .to_string()
+}
+
+/// Default system prompt used when the source language is set to auto-detect.
+/// Only supports the `{to}` placeholder (the source language is left to the
+/// model to detect).
+pub fn default_llm_auto_prompt() -> String {
+    "You are a professional translator. Detect the source language and translate the following text to {to}. \
+     Only output the translation, nothing else. Do not add explanations or notes."
+        .to_string()
+}
+
 impl Default for LlmConfig {
     fn default() -> Self {
         Self {
             base_url: default_llm_base_url(),
             api_key: String::new(),
             model: default_llm_model(),
+            prompt: default_llm_prompt(),
+            auto_prompt: default_llm_auto_prompt(),
         }
     }
 }

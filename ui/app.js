@@ -161,7 +161,9 @@ function defaultSettings() {
     llmConfig: {
       baseUrl: "https://api.openai.com/v1/chat/completions",
       apiKey: "",
-      model: "gpt-4o-mini"
+      model: "gpt-4o-mini",
+      prompt: "You are a professional translator. Translate the following text from {from} to {to}. Only output the translation, nothing else. Do not add explanations or notes.",
+      autoPrompt: "You are a professional translator. Detect the source language and translate the following text to {to}. Only output the translation, nothing else. Do not add explanations or notes."
     },
     popupShortcut: null,
     proxyMode: "system",
@@ -362,6 +364,20 @@ function renderMain() {
                     value="${escapeHtml(state.settings.llmConfig.model)}"
                     placeholder="gpt-4o-mini" />
           </div>
+          <div class="settings-row settings-row-vertical">
+            <span class="settings-label">提示词（指定源语言）
+              <span class="settings-hint">可用 {from} / {to} 表示源/目标语言</span>
+            </span>
+            <textarea class="settings-input settings-textarea" id="llm-prompt" rows="4"
+                    placeholder="${escapeHtml(defaultSettings().llmConfig.prompt)}">${escapeHtml(state.settings.llmConfig.prompt || "")}</textarea>
+          </div>
+          <div class="settings-row settings-row-vertical">
+            <span class="settings-label">提示词（自动检测源语言）
+              <span class="settings-hint">源语言为“自动检测”时使用，可用 {to}</span>
+            </span>
+            <textarea class="settings-input settings-textarea" id="llm-auto-prompt" rows="4"
+                    placeholder="${escapeHtml(defaultSettings().llmConfig.autoPrompt)}">${escapeHtml(state.settings.llmConfig.autoPrompt || "")}</textarea>
+          </div>
         </div>
       </div>
     </div>`;
@@ -454,9 +470,13 @@ function renderMain() {
   const baseUrlInput = document.querySelector("#llm-base-url");
   const apiKeyInput = document.querySelector("#llm-api-key");
   const modelInput = document.querySelector("#llm-model");
+  const promptInput = document.querySelector("#llm-prompt");
+  const autoPromptInput = document.querySelector("#llm-auto-prompt");
   if (baseUrlInput) baseUrlInput.addEventListener("change", e => { state.settings.llmConfig.baseUrl = e.target.value.trim(); saveSettings().catch(() => {}); });
   if (apiKeyInput) apiKeyInput.addEventListener("change", e => { state.settings.llmConfig.apiKey = e.target.value.trim(); saveSettings().catch(() => {}); });
   if (modelInput) modelInput.addEventListener("change", e => { state.settings.llmConfig.model = e.target.value.trim(); saveSettings().catch(() => {}); });
+  if (promptInput) promptInput.addEventListener("change", e => { state.settings.llmConfig.prompt = e.target.value; saveSettings().catch(() => {}); });
+  if (autoPromptInput) autoPromptInput.addEventListener("change", e => { state.settings.llmConfig.autoPrompt = e.target.value; saveSettings().catch(() => {}); });
 
   inp.focus();
 }
