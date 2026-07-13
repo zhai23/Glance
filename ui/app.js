@@ -36,7 +36,50 @@ const PROXY_MODES = [
   { value: "none", label: "不使用" }
 ];
 
+// Measure the height the window needs to fit the whole app content (header +
+// translation area + settings panel) without leaving blank space.
+//
+// IMPORTANT: the settings panel uses `flex: 1 1 auto`, so once the window has
+// been enlarged the panel is stretched to fill the remaining space and its
+// `offsetHeight`/`scrollHeight` no longer reflect the content's natural height.
+// Reading those would make the window grow a little on every engine switch.
+// Instead we measure the panel's *content* (its `.settings-section` children),
+// which is unaffected by how tall the panel is stretched.
 function settingsHeight() {
+  const appEl = document.querySelector(".bento-app");
+  const header = document.querySelector(".header-block");
+  const textBlock = document.querySelector(".text-block");
+  const panel = document.querySelector("#settings-panel");
+  if (appEl && header && textBlock && panel) {
+    const appCs = getComputedStyle(appEl);
+    const appPadding = parseFloat(appCs.paddingTop) + parseFloat(appCs.paddingBottom);
+    const appGap = parseFloat(appCs.rowGap || appCs.gap) || 0;
+
+    // Natural content height of the settings panel = its own vertical padding
+    // plus the height of every visible section inside it.
+    const panelCs = getComputedStyle(panel);
+    let panelContent = parseFloat(panelCs.paddingTop) + parseFloat(panelCs.paddingBottom);
+    panel.querySelectorAll(":scope > .settings-section").forEach(section => {
+      if (getComputedStyle(section).display === "none") return;
+      const sCs = getComputedStyle(section);
+      panelContent +=
+        section.offsetHeight +
+        parseFloat(sCs.marginTop) +
+        parseFloat(sCs.marginBottom);
+    });
+
+    // header + text-block + panel content, with two gaps between the three
+    // top-level blocks, plus the app container padding.
+    const total =
+      header.offsetHeight +
+      textBlock.offsetHeight +
+      panelContent +
+      appGap * 2 +
+      appPadding;
+    const measured = Math.ceil(total) + 2;
+    if (measured > 0) return measured;
+  }
+  // Fallback estimate.
   let h = 560;
   if (state.settings?.textTranslateEngine === "llm") h += 200;
   if (state.settings?.proxyMode === "custom") h += 56;
@@ -219,7 +262,7 @@ function renderMain() {
   }
 
   app.innerHTML = `
-    <div class="bento-app">
+    <div class="bento-app${state.settingsOpen ? " settings-open" : ""}">
       <div class="block header-block" data-tauri-drag-region>
         <div class="header-left">
           <div class="app-title">Glance</div>
@@ -347,6 +390,7 @@ function renderMain() {
     const panel = document.querySelector("#settings-panel");
     const btn = e.currentTarget;
     panel.style.display = state.settingsOpen ? "" : "none";
+    document.querySelector(".bento-app")?.classList.toggle("settings-open", state.settingsOpen);
     btn.classList.toggle("open", state.settingsOpen);
     if (state.settingsOpen) {
       invoke?.("resize_main_window", { height: settingsHeight() }).catch(() => {});
@@ -380,8 +424,11 @@ function renderMain() {
       // Toggle LLM settings visibility
       const llmSettings = document.querySelector("#llm-settings");
       if (llmSettings) llmSettings.style.display = newEngine === "llm" ? "" : "none";
-      // Resize window
-      invoke?.("resize_main_window", { height: settingsHeight() }).catch(() => {});
+      // Resize window only while the settings panel is open; otherwise keep the
+      // compact translation view unchanged.
+      if (state.settingsOpen) {
+        invoke?.("resize_main_window", { height: settingsHeight() }).catch(() => {});
+      }
     });
   });
 
@@ -395,7 +442,9 @@ function renderMain() {
       document.querySelectorAll("#proxy-switcher .engine-btn").forEach(b => b.classList.toggle("active", b.dataset.proxy === newMode));
       const customRow = document.querySelector("#custom-proxy-row");
       if (customRow) customRow.style.display = newMode === "custom" ? "" : "none";
-      invoke?.("resize_main_window", { height: settingsHeight() }).catch(() => {});
+      if (state.settingsOpen) {
+        invoke?.("resize_main_window", { height: settingsHeight() }).catch(() => {});
+      }
     });
   });
   const customProxyInput = document.querySelector("#custom-proxy");

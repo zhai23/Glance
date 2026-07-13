@@ -164,7 +164,18 @@ body.capture-preparing *::after {
   border-radius: var(--radius-xl);
   padding: 14px 16px;
   box-shadow: 0 2px 8px rgba(0,0,0,0.02);
-  flex-shrink: 0;
+  flex: 1 1 auto;
+  min-height: 0;
+  /* Scroll with the wheel when content overflows, but never show a scrollbar
+     (its appearance/disappearance during the resize caused a flash). */
+  overflow-y: auto;
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* old Edge */
+}
+.settings-panel::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none; /* Chromium / WebView2 */
 }
 .settings-section {
   display: flex;
@@ -196,6 +207,10 @@ body.capture-preparing *::after {
 .settings-btn.open { color: var(--accent); }
 
 /* ── Text block: left input + right output ── */
+/* The translation area fills the window when settings are collapsed. When the
+   settings panel is visible (window grows), its height is capped so it stays
+   the same size and the extra vertical space is absorbed by the settings
+   panel below. */
 .text-block {
   display: flex;
   flex-direction: row;
@@ -203,6 +218,10 @@ body.capture-preparing *::after {
   flex: 1 1 0;
   min-height: 0;
   overflow: hidden;
+}
+.bento-app.settings-open .text-block {
+  flex: 0 0 auto;
+  height: 200px;
 }
 .text-col {
   flex: 1 1 0;
